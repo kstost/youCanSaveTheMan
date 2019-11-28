@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <script src="https://kstost.github.io/InitPixi/pixi_loader_3.js"></script>
+    <script>
+        let cols = 9;
+        let rows = 6;
+        let node_table = {};
+        let COLOR = {
+            FIRE: 0xe00000,
+            MAN: 0x0077b3,
+            BLANK: 0xffffff,
+        };
+        function is_available_pos(pos, rev) {
+            let up = { x: pos.x, y: pos.y - 1 };
+            let down = { x: pos.x, y: pos.y + 1 };
+            let left = { x: pos.x - 1, y: pos.y };
+            let right = { x: pos.x + 1, y: pos.y };
+            if (!rev) {
+                if (!(left.x >= 0 && left.x < cols)) { left = null; }
+                if (!(right.x >= 0 && right.x < cols)) { right = null; }
+                if (!(up.y >= 0 && up.y < rows)) { up = null; }
+                if (!(down.y >= 0 && down.y < rows)) { down = null; }
+            } else {
+                if ((left.x >= 0 && left.x < cols)) { left = null; }
+                if ((right.x >= 0 && right.x < cols)) { right = null; }
+                if ((up.y >= 0 && up.y < rows)) { up = null; }
+                if ((down.y >= 0 && down.y < rows)) { down = null; }
+            }
+            let rtn = {};
+            if (left) { rtn.left = left; }
+            if (right) { rtn.right = right; }
+            if (up) { rtn.up = up; }
+            if (down) { rtn.down = down; }
+            return rtn;
+        }
+        function burning() {
+            (() => {
+                for (let i = 0; get_not_burned().length; i++) {
+                    get_fires(i).forEach(node => {
+                        function set(mode) {
+                            if (mode) {
+                                if (get_block(mode.x, mode.y).depth === undefined) {
+                                    set_block_mode(mode.x, mode.y, COLOR.FIRE, i + 1);
+                                }
+                            }
+                        }
+                        let rs = is_available_pos(node.pos);
+                        Object.keys(rs).forEach(key => {
+                            set(rs[key]);
+                        });
+                    });
+                }
+            })();
+        }
+        function set_fire(depth) {
+            fill_all_blank();
+            get_fires(depth, !false).forEach(block => {
+                let mode = block.pos;
+                set_block_mode(mode.x, mode.y, COLOR.FIRE);
+            });
+        }
+        function set_block_mode(x, y, color, depth) {
+            let block = get_block(x, y);
+            block.tint = color;
+            block.label.visible = color === COLOR.FIRE;
+            if (depth !== undefined) {
+                block.depth = depth;
+                block.label.text = depth;
+            }
+        }
+        function fill_all_blank() {
+            let keys = Object.keys(node_table);
+            for (let i = 0; i < keys.length; i++) {
+                let mode = node_table[keys[i]].pos;
+                set_block_mode(mode.x, mode.y, COLOR.BLANK);
+            }
+        }
+        function get_block(x, y) {
+            let key = x + '_' + y;
+            return node_table[key];
+        }
+        function get_not_burned() {
+            let list = [];
+            let keys = Object.keys(node_table);
+            for (let i = 0; i < keys.length; i++) {
+                let node = node_table[keys[i]];
+                if (node.depth === undefined) {
+                    list[list.length] = node;
+                }
+            }
+            return list;
+        }
+        function get_fires(depth, include) {
+            let list = [];
+            let target = depth;
+            let keys = Object.keys(node_table);
+            for (let i = 0; i < keys.length; i++) {
+                let node = node_table[keys[i]];
+                if (include) {
+                    if (node.depth <= target) {
+                        list[list.length] = node;
+                    }
+                } else {
+                    if (node.depth === target) {
+                        list[list.length] = node;
+                    }
+                }
+            }
+            return list;
+        }
+        window.onload = function () {
+            let GAME = $pxi.create_screen({ width: 100 * cols, height: 100 * rows, screen_bgcolor: '#000', body_bgcolor: '#222' });
+            let circle_radius = GAME.size.width / (cols * 2);
+            for (let x = 0; x < cols; x++) {
+                for (let y = 0; y < rows; y++) {
+                    let key = x + '_' + y;
+                    let circle = new PIXI.Graphics();
+                    circle.beginFill(COLOR.BLANK);
+                    circle.drawCircle(0, 0, circle_radius);
+                    circle.endFill();
+                    circle.position.x = circle_radius + (x * (circle_radius * 2));
+                    circle.position.y = circle_radius + (y * (circle_radius * 2));
+                    circle.pos = { x: x, y: y };
+                    circle.posid = key;
+                    GAME.stage.addChild(circle);
+                    let pos = null;
+                    if (true) {
+                        let label = new PIXI.Text('x:' + x + ' y:' + y, new PIXI.TextStyle({
+                            fontFamily: "Arial",
+                            fontSize: circle_radius / 3,
+                            fill: "black",
+                        }));
+                        label.anchor.x = 0.5;
+                        label.anchor.y = 0.5;
+                        label.position.y = 0;
+                        label.position.x = 0;
+                        pos = label;
+                        circle.addChild(label);
+                    }
+                    if (true) {
+                        let label = new PIXI.Text('s', new PIXI.TextStyle({
+                            fontFamily: "Arial",
+                            fontSize: circle_radius / 2,
+                            fill: "black",
+                        }));
+                        label.anchor.x = 0.5;
+                        label.anchor.y = 0.5;
+                        label.position.y = 0 - pos.height;
+                        label.position.x = 0;
+                        circle.addChild(label);
+                        circle.label = label;
+                        label.text = '';
+                    }
+                    node_table[key] = circle;
+                }
+            }
+
+            set_block_mode(2, 2, COLOR.FIRE, 0);
+            set_block_mode(4, 4, COLOR.FIRE, 0);
+            set_block_mode(6, 3, COLOR.FIRE, 0);
+            if (false) {
+                set_block_mode(4, 0, COLOR.FIRE, 0);
+                set_block_mode(4, 5, COLOR.FIRE, 0);
+                set_block_mode(2, 2, COLOR.FIRE, 0);
+                set_block_mode(6, 2, COLOR.FIRE, 0);
+            }
+            burning();
+            set_fire(0);
+
+            let fill_proc = [];
+            (() => {
+                let checked_pos = {};
+                let recursive_search = function (node_pos, ddd) {
+                    set_fire(ddd);
+                    let poskey = node_pos.x + '_' + node_pos.y;
+                    if (checked_pos[poskey] === undefined) {
+                        checked_pos[poskey] = true;
+                        let rt = is_available_pos(node_pos);
+                        if (Object.keys(rt).length < 4) {
+                            let rt2 = is_available_pos(node_pos, true);
+                            fill_proc[fill_proc.length] = {
+                                mode: 'ESC',
+                                current: node_pos,
+                                depth: ddd,
+                            };
+                        } else {
+                            let keylist = Object.keys(rt);
+                            for (let i = 0; i < keylist.length; i++) {
+                                let key = keylist[i];
+                                fill_proc[fill_proc.length] = {
+                                    mode: 'CHECK',
+                                    depth: ddd,
+                                    pos: rt[key],
+                                };
+
+                                let node = get_block(rt[key].x, rt[key].y);
+                                if (node.tint === COLOR.FIRE) {
+                                    fill_proc[fill_proc.length] = {
+                                        mode: 'DEAD',
+                                        depth: ddd,
+                                        pos: rt[key],
+                                    };
+                                } else {
+                                    fill_proc[fill_proc.length] = {
+                                        mode: 'OK',
+                                        depth: ddd,
+                                        pos: rt[key],
+                                    };
+                                    recursive_search(rt[key], ddd + 1);
+                                }
+                            }
+                        }
+                    }
+                }
+                let start = { x: 4, y: 2 };
+                recursive_search(start, 0);
+                (async () => {
+                    for (let i = 0; i < fill_proc.length; i++) {
+                        await new Promise(r => { setTimeout(r, 300); });
+                        let pos = fill_proc[i].pos;
+                        set_fire(fill_proc[i].depth);
+                        if (fill_proc[i].mode === 'OK') {
+                            set_block_mode(pos.x, pos.y, 0x00e331);
+                        }
+                        if (fill_proc[i].mode === 'CHECK') {
+                            set_block_mode(pos.x, pos.y, 0x00ba95);
+                        }
+                        if (fill_proc[i].mode === 'DEAD') {
+                            set_block_mode(pos.x, pos.y, 0x828282);
+                        }
+                        if (fill_proc[i].mode === 'ESC') {
+                            let current = fill_proc[i].current;
+                            set_block_mode(current.x, current.y, 0x00bbff);
+                            break;
+                        }
+                    }
+                })();
+            })();
+        }
+    </script>
+</head>
+
+<body>
+</body>
+
+</html>
